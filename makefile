@@ -1,9 +1,9 @@
-CC=g++
-LD=g++
+CC=mpic++
+LD=mpic++
 
 
-CFLAGS=-I/usr/include/openmpi-x86_64 -pthread -m64
-LDFLAGS=-pthread -m64 -L/usr/lib64/openmpi/lib -lmpi_cxx -lmpi
+CFLAGS=
+LDFLAGS=
 
 SRCS=main.cpp process.cpp utils.cpp
 OBJECTS=$(SRCS:.cpp=.o)

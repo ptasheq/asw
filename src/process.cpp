@@ -1,5 +1,6 @@
 #include "process.h"
 #include "protocol.h"
+#include "utils.h"
 #include <iostream>
 #include <mpi.h>
 #include <unistd.h>
@@ -8,6 +9,9 @@ void Process::dispatchMessage(MPI_Status * status) {
 }
 
 int Process::run(int rank, int size) {
+
+	Utils::loadSettings(this->settings);
+
 	int flag;
 	MPI_Status status;
 	while (true) {

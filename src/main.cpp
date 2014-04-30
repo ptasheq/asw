@@ -4,13 +4,13 @@
 
 int main(int argc, char **argv) {
 
-	int val = Utils::checkArguments(argc, argv);
-	int size, rank, len;
-
 	MPI_Init(&argc,&argv);
+	int size, rank, len;
 
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+	
+	int val = Utils::checkArguments(argc, argv);
 
 	if (size <= val) {
 		MPI_Finalize();

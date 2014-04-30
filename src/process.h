@@ -3,10 +3,17 @@
 
 #include <mpi.h>
 
+struct Settings {
+    int pubCount;
+    int * pubCapacity;
+    int soberStationCapacity;
+};
+
 class Process {
 protected:
 	int rank, size;
 	int msg;
+	Settings * settings;
 public:
 	virtual void dispatchMessage(MPI_Status * status);
 	virtual void performAction();
