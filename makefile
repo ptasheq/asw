@@ -1,7 +1,6 @@
 CC=mpic++
 LD=mpic++
 
-
 CFLAGS=
 LDFLAGS=
 

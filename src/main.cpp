@@ -9,12 +9,13 @@ int main(int argc, char **argv) {
 
 	MPI_Comm_size(MPI_COMM_WORLD, &size);
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-	
+
 	int val = Utils::checkArguments(argc, argv);
+	Utils::loadSettings();
 
 	if (size <= val) {
 		MPI_Finalize();
 		return 0;
 	}
-	return (rank < val) ? SocialWorker::getInstance().run(rank, size) : Alcoholic::getInstance().run(rank, size);
+	return (rank < val) ? SocialWorker::getInstance().run(rank, size, val) : Alcoholic::getInstance().run(rank, size, val);
 }

@@ -3,13 +3,15 @@
 #include <mpi.h>
 #include <cstdlib>
 #include <fstream>
-#include <algorithm>
 #include "consts.h"
 #include "process.h"
+#include "utils.h"
 
-const int DEFAULT_PUB_CAPACITY[] = {10};
+const int DEFAULT_PUB_CAPACITY[] = {3, 4};
 
 namespace Utils {
+
+Settings settings;
 
 int checkArguments(int argc, char ** argv) {
 	if (argc != 2) {
@@ -27,25 +29,30 @@ int checkArguments(int argc, char ** argv) {
 	return val;
 }
 
-int loadSettings(Settings * settings) {
+int loadSettings() {
+	std::ifstream configFile (CONFIGFILE_PATH, std::ifstream::in);	
 
-	if (!settings) {
-		settings = new Settings;
+	// config file doesn't exist we use deafult settings
+	if (configFile.fail()) {
+		settings.pubCount = DEFAULT_PUB_NUMBER;
+		settings.pubCapacity.resize(settings.pubCount); 
+		for (int i = 0; i < settings.pubCount; ++i) {
+			settings.pubCapacity[i] = DEFAULT_PUB_CAPACITY[i];
+		}
+		settings.soberStationCapacity = DEFAULT_SOBER_STATION_CAPACITY;
+		settings.iterations = DEFAULT_ITERATIONS;
 	}
-    std::ifstream configFile (CONFIGFILE_PATH, std::ios::in);
-
-    // problem with access to config file, we use deafult settings
-    if (configFile.fail()) {
-    	settings->pubCount = DEFAULT_PUB_NUMBER;
-    	settings->pubCapacity = new int [DEFAULT_PUB_NUMBER];
-    	std::copy(DEFAULT_PUB_CAPACITY, DEFAULT_PUB_CAPACITY+1, settings->pubCapacity);
-    	settings->soberStationCapacity = DEFAULT_SOBERINGUP_STATION_CAPACITY;
-    	std::cout << settings->pubCapacity[0] << std::endl;
-    }
-    // config file seems to be ok
-    else {
-    	// TODO
-    }
+	else {
+		configFile >> settings.pubCount;
+		settings.pubCapacity.resize(settings.pubCount);
+		for (int i = 0; i < settings.pubCount; ++i) {
+			configFile >> settings.pubCapacity[i];
+		}
+		configFile >> settings.soberStationCapacity;
+		configFile >> settings.iterations;
+		configFile.close();
+	}
+	return 0;
 }
 
 }

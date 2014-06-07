@@ -3,8 +3,9 @@
 
 #define FAIL -1
 #define CONFIGFILE_PATH "config/config.cfg"
-#define DEFAULT_PUB_NUMBER 1
-#define DEFAULT_SOBERINGUP_STATION_CAPACITY 5
-extern const int DEFAULT_PUB_CAPACITY[];
+#define DEFAULT_PUB_NUMBER 2
+#define DEFAULT_SOBER_STATION_CAPACITY 5
+#define DEFAULT_ITERATIONS 1000 
+extern const int DEFAULT_PUB_CAPACITY[]; 
 
 #endif

@@ -1,6 +1,7 @@
 #include "process.h"
 #include "protocol.h"
 #include "utils.h"
+#include "consts.h"
 #include <iostream>
 #include <mpi.h>
 #include <unistd.h>
@@ -8,27 +9,50 @@
 void Process::dispatchMessage(MPI_Status * status) {
 }
 
-int Process::run(int rank, int size) {
-
-	Utils::loadSettings(this->settings);
+int Process::run(int rank, int size, int val) {
 
 	int flag;
 	MPI_Status status;
-	while (true) {
-		MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &status);
+	for (int it = 0; it < Utils::settings.iterations; it++) {
+		
+		// making the pairs
+		if (rank < val) {
+			for (int processIter = val; processIter < size; processIter++) {
+				this->performAction(processIter, WANNA_DRINK);
+				this->dispatchMessage(&status);
+				if (status.MPI_TAG == READY) {
+					//TODO polaczenie w pare status.MPI_SOURCE
+					break;
+				}
+			}
+		} else {
+			this->dispatchMessage(&status);
+		}
+
+		// going to pub
+
+		if (rank < val) {
+			flag = -1;
+			for (int pubIter = 0; pubIter < Utils::settings.pubCount; pubIter++) {
+				//for (int processIter = 0)
+			}
+		}
+
+		
+		/*MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &status);
 		while (flag) {
 			this->dispatchMessage(&status);
 			MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &status);
 		}
 		this->performAction();
-		sleep(1);
-	}
+		sleep(1);*/
 
+	}
 	MPI_Finalize();
 	return 0;
 }
 
-void Process::performAction() {
+void Process::performAction(int, int) {
 }
 
 void Process::showIdentity() {
@@ -51,8 +75,8 @@ SocialWorker & SocialWorker::getInstance() {
 	return instance;
 }
 
-void SocialWorker::performAction() {
-	MPI_Send(&this->rank, 1, MPI_INT, 1, WANNA_DRINK, MPI_COMM_WORLD);
+void SocialWorker::performAction(int rec, int tag) {
+	MPI_Send(&this->rank, rec, MPI_INT, 1, tag, MPI_COMM_WORLD);
 	std::cout << "message sent" << std::endl;
 }
 
@@ -79,7 +103,7 @@ Alcoholic & Alcoholic::getInstance() {
 	return instance;
 }
 
-void Alcoholic::performAction() {
+void Alcoholic::performAction(int rec, int tag) {
 }
 
 void Alcoholic::showIdentity() {
