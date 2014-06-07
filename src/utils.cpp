@@ -6,6 +6,7 @@
 #include "consts.h"
 #include "process.h"
 #include "utils.h"
+#include <ctime>
 
 const int DEFAULT_PUB_CAPACITY[] = {3, 4};
 
@@ -53,6 +54,13 @@ int loadSettings() {
 		configFile.close();
 	}
 	return 0;
+}
+
+void msleep(int miliseconds) {
+	struct timespec t, t2;
+	t.tv_sec = 0;
+	t.tv_nsec = 1000000 * miliseconds;
+	nanosleep(&t, &t2);
 }
 
 }

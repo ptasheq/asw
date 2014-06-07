@@ -16,6 +16,7 @@ namespace Utils {
 
 	int checkArguments(int, char **);
 	int loadSettings();
+	void msleep(int);
 
 }
 
