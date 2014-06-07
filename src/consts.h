@@ -8,4 +8,7 @@
 #define DEFAULT_ITERATIONS 1000 
 extern const int DEFAULT_PUB_CAPACITY[]; 
 
+enum WorkerStates {SEARCHING_FOR_PAIR=0, SEARCHING_FOR_PUB};
+enum AlcoholicStates {WAITING_FOR_PAIR=0, IN_PAIR};
+
 #endif

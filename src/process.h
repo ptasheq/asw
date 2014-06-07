@@ -5,11 +5,12 @@
 
 class Process {
 protected:
-	int rank, size, clk, val;
+	int rank, size, clk, workerCount;
+	int partnerRank, myState;
 	int msg;
 public:
 	virtual void dispatchMessage(MPI_Status * status);
-	virtual void performAction(int, int);
+	virtual void performAction();
 	virtual int run(int, int, int);
 	virtual void showIdentity();
 };
@@ -21,7 +22,7 @@ private:
 public:
 	void dispatchMessage(MPI_Status * status);
 	static Alcoholic & getInstance();
-	void performAction(int, int);
+	void performAction();
 	void showIdentity();
 };
 
@@ -32,8 +33,9 @@ private:
 public:
 	void dispatchMessage(MPI_Status * status);
 	static SocialWorker & getInstance();
-	void performAction(int, int);
+	void performAction();
 	void showIdentity();
+	void waitForMessageFrom(int);
 };
 
 #endif
