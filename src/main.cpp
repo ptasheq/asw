@@ -1,6 +1,7 @@
 #include <mpi.h>
 #include "process.h"
 #include "utils.h"
+#include <iostream>
 
 int main(int argc, char **argv) {
 
@@ -12,7 +13,6 @@ int main(int argc, char **argv) {
 
 	int val = Utils::checkArguments(argc, argv);
 	Utils::loadSettings();
-
 	if (size <= val) {
 		MPI_Finalize();
 		return 0;
