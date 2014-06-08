@@ -10,11 +10,13 @@ protected:
 	int partnerRank, myState;
 	int msg;
 	std::stack<int> waitingForAccept;
+	int cycles;
 public:
 	virtual void dispatchMessage(MPI_Status *, int *);
 	virtual void performAction();
 	virtual int run(int, int, int);
 	virtual void showIdentity();
+	virtual void updateClock(int);
 };
 
 class Alcoholic: public Process {
@@ -34,7 +36,7 @@ private:
 	SocialWorker();
 	~SocialWorker();
 	int myPub, remainDrinkTime;
-	int * pubCapacities;
+	int * pubQueues;
 public:
 	void dispatchMessage(MPI_Status *, int *);
 	static SocialWorker & getInstance();
