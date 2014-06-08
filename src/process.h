@@ -3,6 +3,7 @@
 
 #include <mpi.h>
 #include <stack>
+#include <fstream>
 
 class Process {
 protected:
@@ -10,6 +11,7 @@ protected:
 	int partnerRank, myState;
 	int msg;
 	std::stack<int> waitingForAccept;
+	std::ofstream logFile;
 	int cycles;
 public:
 	virtual void dispatchMessage(MPI_Status *, int *);

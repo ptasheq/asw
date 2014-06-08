@@ -8,6 +8,8 @@
 #include <vector>
 #include <cstdlib>
 #include <ctime>
+#include <sstream>
+
 
 void Process::dispatchMessage(MPI_Status * status, int * msg) {
 }
@@ -18,6 +20,9 @@ int Process::run(int rank, int size, int val) {
 	this->workerCount = val;
 	this->size = size;
 	this->rank = rank;
+	std::stringstream ss;
+	ss << "log/sw_" << rank << ".log";
+	this->logFile.open(ss.str().c_str(), std::fstream::out | std::fstream::trunc);
 	MPI_Status status;
 	srand(time(NULL));
 
@@ -76,17 +81,17 @@ void SocialWorker::dispatchMessage(MPI_Status * status, int * msg) {
 		}
 		break;
 		case CAN_ENTER: {
-			std::cout << "Worker " << this->rank << " got request from " << status->MPI_SOURCE << std::endl;
+			this->logFile << "Worker " << this->rank << " got request from " << status->MPI_SOURCE << std::endl;
 			int tmpMsg[3];
 			MPI_Recv(tmpMsg, 2, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status);
 			this->updateClock(tmpMsg[0]);
 			if (this->myState == SEARCHING_FOR_PUB || this->myState == IN_PUB) {
-				// remember about priority
+				// remember about prio
 				if (this->myPub != tmpMsg[1]) {
 					tmpMsg[0] = this->clk;
 					tmpMsg[2] = tmpMsg[1];
 					tmpMsg[1] = this->myPub;
-					std::cout << "Worker " << this->rank << " accepting request from " << status->MPI_SOURCE << std::endl;
+					this->logFile << "Worker " << this->rank << " accepting request from " << status->MPI_SOURCE << std::endl;
 					MPI_Send(tmpMsg, 3, MPI_INT, status->MPI_SOURCE, ACCEPT, MPI_COMM_WORLD); 
 				}
 				else if (this->myState == SEARCHING_FOR_PUB && tmpMsg[0] <= this->clk) {
@@ -94,7 +99,7 @@ void SocialWorker::dispatchMessage(MPI_Status * status, int * msg) {
 						tmpMsg[0] = this->clk;
 						tmpMsg[2] = tmpMsg[1];
 						tmpMsg[1] = this->myPub;
-						std::cout << "Worker " << this->rank << " accepting request from " << status->MPI_SOURCE << std::endl;
+						this->logFile << "Worker " << this->rank << " accepting request from " << status->MPI_SOURCE << std::endl;
 						MPI_Send(tmpMsg, 3, MPI_INT, status->MPI_SOURCE, ACCEPT, MPI_COMM_WORLD); 
 					}	
 				}
@@ -102,10 +107,10 @@ void SocialWorker::dispatchMessage(MPI_Status * status, int * msg) {
 					waitingForAccept.push(status->MPI_SOURCE);
 				}
 			} else {
-				tmpMsg[0] = clk;
+				tmpMsg[0] = this->clk;
 				tmpMsg[2] = tmpMsg[1];
 				tmpMsg[1] = NOT_IN_PUB;
-				std::cout << "Worker " << this->rank << " accepting request from " << status->MPI_SOURCE << std::endl;
+				this->logFile << "Worker " << this->rank << " accepting request from " << status->MPI_SOURCE << std::endl;
 				MPI_Send(tmpMsg, 3, MPI_INT, status->MPI_SOURCE, ACCEPT, MPI_COMM_WORLD);
 			}
 		}
@@ -130,18 +135,18 @@ void SocialWorker::performAction() {
 		case SEARCHING_FOR_PAIR: {
 			std::vector<int> alcoholics;
 			for (int i = this->workerCount; i < this->size; ++i) alcoholics.push_back(i); 
-			std::cout << "Worker " <<this->rank << " searching for pair, " <<this->workerCount << " " << this->size << std::endl;
+			this->logFile << "Worker " <<this->rank << " searching for pair, " <<this->workerCount << " " << this->size << std::endl;
 			int processIter;
 
 			while (alcoholics.size() > 0) {
 				processIter = rand() % alcoholics.size();
 				msg = this->clk;
 				MPI_Send(&msg, 1, MPI_INT, alcoholics[processIter], WANNA_DRINK, MPI_COMM_WORLD);
-				std::cout << "Worker " << this->rank<< " waiting for message from " << alcoholics[processIter] << std::endl;
+				this->logFile << "Worker " << this->rank<< " waiting for message from " << alcoholics[processIter] << std::endl;
 				this->waitForMessageFrom(alcoholics[processIter]);
 				this->dispatchMessage(&status, NULL);
 				if (status.MPI_TAG == SURE) {
-					std::cout << "Worker " << this->rank << " waiting in queue with " << alcoholics[processIter] << std::endl;
+					this->logFile << "Worker " << this->rank << " waiting in queue with " << alcoholics[processIter] << std::endl;
 					this->partnerRank = status.MPI_SOURCE;
 					this->myState = SEARCHING_FOR_PUB;
 					break;
@@ -157,7 +162,7 @@ void SocialWorker::performAction() {
 
 			for (int processIter = 0; processIter < this->workerCount; ++processIter) {
 				if (processIter != this->rank) {
-					//std::cout << "Worker " << this->rank << " : sending request (Pub " << this->myPub << ")" << std::endl;
+					//this->logFile << "Worker " << this->rank << " : sending request (Pub " << this->myPub << ")" << std::endl;
 					MPI_Send(msg, 2, MPI_INT, processIter, CAN_ENTER, MPI_COMM_WORLD);
 				}
 			}
@@ -221,7 +226,7 @@ void SocialWorker::performAction() {
 			for (int i = 0; i < Utils::settings.pubCount; ++i) {
 				this->pubQueues[i] = 0;
 			}
-			std::cout << "Worker " << this->rank << " enters pub " << this->myPub << std::endl;
+			this->logFile << "Worker " << this->rank << " enters pub " << this->myPub << std::endl;
 			this->myState = IN_PUB;
 			this->remainDrinkTime = MIN_PUB_TIME + rand() % TOLERANCE_PUB_TIME;
 		}
@@ -229,7 +234,7 @@ void SocialWorker::performAction() {
 		case IN_PUB: {
 			if (this->remainDrinkTime <= 0) {
 				// informing others that they can leave
-				std::cout << "Worker " << this->rank << " and Alcoholic " << this->partnerRank << " are leaving pub " << this->myPub << std::endl;
+				this->logFile << "Worker " << this->rank << " and Alcoholic " << this->partnerRank << " are leaving pub " << this->myPub << std::endl;
 				this->myPub = NOT_IN_PUB;
 				int msg[3] = {this->clk, this->myPub, this->myPub};
 				while (!waitingForAccept.empty()) {
@@ -249,7 +254,7 @@ void SocialWorker::performAction() {
 }
 
 void SocialWorker::showIdentity() {
-	std::cout << "I'm a social worker" << std::endl;
+	this->logFile << "I'm a social worker" << std::endl;
 }
 
 void SocialWorker::waitForMessageFrom(int processId) {
@@ -283,11 +288,11 @@ void Alcoholic::dispatchMessage(MPI_Status * status, int * msg) {
 			this->updateClock(tmpMsg);
 			if (this->myState == WAITING_FOR_PAIR) {
 				this->myState = IN_PAIR;
-				std::cout << "Alcoholic " << this->rank << " agreed to " << status->MPI_SOURCE << std::endl;
+				this->logFile << "Alcoholic " << this->rank << " agreed to " << status->MPI_SOURCE << std::endl;
 				MPI_Send(&this->clk, 1, MPI_INT, status->MPI_SOURCE, SURE, MPI_COMM_WORLD); 
 			}
 			else {
-				std::cout << "Alcoholic " << this->rank << " disagreed to " << status->MPI_SOURCE << std::endl;
+				this->logFile << "Alcoholic " << this->rank << " disagreed to " << status->MPI_SOURCE << std::endl;
 				MPI_Send(&this->clk, 1, MPI_INT, status->MPI_SOURCE, NOPE, MPI_COMM_WORLD); 
 			}
 		break;
@@ -301,7 +306,7 @@ void Alcoholic::dispatchMessage(MPI_Status * status, int * msg) {
 		break;
 		
 		case CAN_ENTER_SOBER_STATION:
-			std::cout << "Alcoholic " << this->rank << " got request from " << status->MPI_SOURCE << std::endl;
+			this->logFile << "Alcoholic " << this->rank << " got request from " << status->MPI_SOURCE << std::endl;
 			MPI_Recv(&tmpMsg, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status);
 			this->updateClock(tmpMsg);
 			if (this->myState == WAITING_FOR_SOBER_STATION || this->myState == IN_SOBER_STATION) {
@@ -357,7 +362,7 @@ void Alcoholic::performAction() {
 				MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &status);
 				Utils::msleep(SLEEP_TIME);
 			}
-			std::cout << "Alcoholic " << this->rank << " enters sober station" << std::endl;
+			this->logFile << "Alcoholic " << this->rank << " enters sober station" << std::endl;
 			this->myState = IN_SOBER_STATION;
 			this->remainRestTime = MIN_REST_TIME + rand() % TOLERANCE_REST_TIME;
 						
@@ -366,7 +371,7 @@ void Alcoholic::performAction() {
 
 		case IN_SOBER_STATION: {
 			if (this->remainRestTime <= 0) {
-				std::cout << "Alcoholic " << this->rank << " leaving sober station" << std::endl;
+				this->logFile << "Alcoholic " << this->rank << " leaving sober station" << std::endl;
 				while (!waitingForAccept.empty()) {
 					MPI_Send(&this->clk, 1, MPI_INT, waitingForAccept.top(), ACCEPT, MPI_COMM_WORLD);
 					waitingForAccept.pop();
@@ -381,5 +386,5 @@ void Alcoholic::performAction() {
 }
 
 void Alcoholic::showIdentity() {
-	std::cout << "I'm an alcoholic" << std::endl;
+	this->logFile << "I'm an alcoholic" << std::endl;
 }
