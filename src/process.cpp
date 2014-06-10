@@ -135,7 +135,7 @@ void SocialWorker::performAction() {
 		case SEARCHING_FOR_PAIR: {
 			std::vector<int> alcoholics;
 			for (int i = this->workerCount; i < this->size; ++i) alcoholics.push_back(i); 
-			this->logFile << "Worker " <<this->rank << " searching for pair, " <<this->workerCount << " " << this->size << std::endl;
+			this->logFile << "Worker " << this->rank << " searching for pair, " << std::endl;
 			int processIter;
 
 			while (alcoholics.size() > 0) {
@@ -146,6 +146,7 @@ void SocialWorker::performAction() {
 				this->waitForMessageFrom(alcoholics[processIter]);
 				this->dispatchMessage(&status, NULL);
 				if (status.MPI_TAG == SURE) {
+					std::cout << "Worker " << this->rank << " waiting in queue with " << alcoholics[processIter] << std::endl;
 					this->logFile << "Worker " << this->rank << " waiting in queue with " << alcoholics[processIter] << std::endl;
 					this->partnerRank = status.MPI_SOURCE;
 					this->myState = SEARCHING_FOR_PUB;
@@ -195,6 +196,7 @@ void SocialWorker::performAction() {
 					for (int i = 0; i < Utils::settings.pubCount; ++i) {
 						if (i != this->myPub) {
 							int tempQueueLength = this->pubQueues[i] - Utils::settings.pubCapacity[i];
+							// there is free space in other pub we go there instantly
 							if (tempQueueLength < 0) {
 								bestPub = i;
 								bestQueueLength = tempQueueLength;
@@ -205,6 +207,7 @@ void SocialWorker::performAction() {
 							}
 						}
 					}
+					// changing pub
 					if (bestQueueLength < 0 || (bestQueueLength + int(0.05 * this->workerCount) + 2) < (waitCount - Utils::settings.pubCapacity[this->myPub])) {
 						this->myPub = bestPub;
 						msg[0] = this->clk;
@@ -218,6 +221,8 @@ void SocialWorker::performAction() {
 						for (int i = 0; i < Utils::settings.pubCount; ++i) {
 							this->pubQueues[i] = 0;
 						}
+						std::cout << "Worker " << this->rank << " changed pub for " << this->myPub << std::endl;
+						this->logFile << "Worker " << this->rank << " changed pub for " << this->myPub << std::endl;
 					}
 
 				}
@@ -226,7 +231,8 @@ void SocialWorker::performAction() {
 			for (int i = 0; i < Utils::settings.pubCount; ++i) {
 				this->pubQueues[i] = 0;
 			}
-			this->logFile << "Worker " << this->rank << " enters pub " << this->myPub << std::endl;
+			std::cout << "Worker " << this->rank << " enters pub " << this->myPub << " with alcoholic " << this->partnerRank << std::endl;
+			this->logFile << "Worker " << this->rank << " enters pub " << this->myPub << " with alcoholic " << this->partnerRank << std::endl;
 			this->myState = IN_PUB;
 			this->remainDrinkTime = MIN_PUB_TIME + rand() % TOLERANCE_PUB_TIME;
 		}
@@ -234,6 +240,7 @@ void SocialWorker::performAction() {
 		case IN_PUB: {
 			if (this->remainDrinkTime <= 0) {
 				// informing others that they can leave
+				std::cout << "Worker " << this->rank << " and Alcoholic " << this->partnerRank << " are leaving pub " << this->myPub << std::endl;
 				this->logFile << "Worker " << this->rank << " and Alcoholic " << this->partnerRank << " are leaving pub " << this->myPub << std::endl;
 				this->myPub = NOT_IN_PUB;
 				int msg[3] = {this->clk, this->myPub, this->myPub};
@@ -362,6 +369,7 @@ void Alcoholic::performAction() {
 				MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &status);
 				Utils::msleep(SLEEP_TIME);
 			}
+			std::cout << "Alcoholic " << this->rank << " enters sober station" << std::endl;
 			this->logFile << "Alcoholic " << this->rank << " enters sober station" << std::endl;
 			this->myState = IN_SOBER_STATION;
 			this->remainRestTime = MIN_REST_TIME + rand() % TOLERANCE_REST_TIME;
@@ -371,6 +379,7 @@ void Alcoholic::performAction() {
 
 		case IN_SOBER_STATION: {
 			if (this->remainRestTime <= 0) {
+				std::cout << "Alcoholic " << this->rank << " leaving sober station" << std::endl;
 				this->logFile << "Alcoholic " << this->rank << " leaving sober station" << std::endl;
 				while (!waitingForAccept.empty()) {
 					MPI_Send(&this->clk, 1, MPI_INT, waitingForAccept.top(), ACCEPT, MPI_COMM_WORLD);
