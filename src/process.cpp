@@ -20,13 +20,14 @@ int Process::run(int rank, int size, int val) {
 	this->workerCount = val;
 	this->size = size;
 	this->rank = rank;
+	this->notReadyToExit = size - 1;
 	std::stringstream ss;
 	ss << "log/sw_" << rank << ".log";
 	this->logFile.open(ss.str().c_str(), std::fstream::out | std::fstream::trunc);
 	MPI_Status status;
 	srand(time(NULL));
 
-	while (this->cycles < Utils::settings.iterations) {
+	while (this->notReadyToExit > 0) {
 		MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &status);
 		while (flag) {
 			this->dispatchMessage(&status, NULL);
@@ -115,6 +116,14 @@ void SocialWorker::dispatchMessage(MPI_Status * status, int * msg) {
 			}
 		}
 		break;
+		case END_OF_PROCESSING: {
+			int tmpMsg;
+			MPI_Recv(&tmpMsg, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status);
+			--this->notReadyToExit;
+			this->updateClock(tmpMsg);
+
+		}
+		break;
 		default: {
 			int tmpMsg;
 			MPI_Recv(&tmpMsg, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status);
@@ -168,35 +177,44 @@ void SocialWorker::performAction() {
 				}
 			}
 
-			int iterationLimit = 3;
+			int iterationLimit = 5;
 			int waitCount = this->workerCount - 1;
 			int acceptsRequired = waitCount - Utils::settings.pubCapacity[this->myPub];
 			MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &status);
 			while (waitCount > 0 && acceptsRequired > 0) {
-				if (flag) {
+				while (flag) {
 					this->dispatchMessage(&status, msg);
 					if (status.MPI_TAG == ACCEPT) {
 						//ACCEPT must concern pub that process is waiting for
 						if (msg[2] == this->myPub) {
+							std::cout << "accept received " << this->rank << std::endl;
+							std::cout << "acceptsReuired " << acceptsRequired << std::endl;
 							if (++acceptCount > acceptsRequired) {
+								acceptsRequired = 0;
 								break;
 							}
-						
+						std::cout << "msg1 " << msg[1] << std::endl;	
 						if (msg[1] != NOT_IN_PUB) this->pubQueues[msg[1]]++;
 						--waitCount;
 						}
 					}
+					MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &status);
 				}
-				MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &status);
+				if (acceptsRequired == 0) {
+					break;
+				}
 				Utils::msleep(SLEEP_TIME);
 				if (--iterationLimit == 0) {
 					int bestPub = this->myPub;
 					int bestQueueLength = waitCount - Utils::settings.pubCapacity[this->myPub];
-					iterationLimit = 3;
+					std::cout << bestQueueLength << std::endl;
+					iterationLimit = 5;
 					for (int i = 0; i < Utils::settings.pubCount; ++i) {
 						if (i != this->myPub) {
 							int tempQueueLength = this->pubQueues[i] - Utils::settings.pubCapacity[i];
 							// there is free space in other pub we go there instantly
+							for (int i = 0; i < Utils::settings.pubCount; ++i) std::cout << this->rank << " " << this->pubQueues[i] << " ";	
+							std::cout << std::endl;
 							if (tempQueueLength < 0) {
 								bestPub = i;
 								bestQueueLength = tempQueueLength;
@@ -218,14 +236,23 @@ void SocialWorker::performAction() {
 						}
 						waitCount = this->workerCount - 1;
 						acceptsRequired = waitCount - Utils::settings.pubCapacity[this->myPub];
+						acceptCount = 0;
 						for (int i = 0; i < Utils::settings.pubCount; ++i) {
 							this->pubQueues[i] = 0;
+						}
+						msg[2] = this->myPub;
+						for (int processIter = 0; processIter < this->workerCount; ++processIter) {
+							if (processIter != this->rank) {
+								//this->logFile << "Worker " << this->rank << " : sending request (Pub " << this->myPub << ")" << std::endl;
+								MPI_Send(msg, 2, MPI_INT, processIter, CAN_ENTER, MPI_COMM_WORLD);
+							}
 						}
 						std::cout << "Worker " << this->rank << " changed pub for " << this->myPub << std::endl;
 						this->logFile << "Worker " << this->rank << " changed pub for " << this->myPub << std::endl;
 					}
 
 				}
+				MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &status);
 			}
 			//cleaning after state
 			for (int i = 0; i < Utils::settings.pubCount; ++i) {
@@ -250,10 +277,16 @@ void SocialWorker::performAction() {
 				}
 				MPI_Send(&this->clk, 1, MPI_INT, this->partnerRank, NO_MORE_DRINKING, MPI_COMM_WORLD);
 				this->partnerRank = NO_PARTNER;
-				this->myState = SEARCHING_FOR_PAIR;
-				this->cycles++;
+				this->myState = (this->cycles++ < Utils::settings.iterations) ? SEARCHING_FOR_PAIR : WORKER_FINISHING;
 			}
 			this->remainDrinkTime -= SLEEP_TIME;
+		break;
+		}
+		case WORKER_FINISHING: {
+			this->myState = WORKER_FINISH; 
+			for (int i = 0; i < this->size; ++i) {
+				if (i != this->rank) MPI_Send(&this->clk, 1, MPI_INT, i, END_OF_PROCESSING, MPI_COMM_WORLD);
+			}
 		break;
 		}
 	}
@@ -328,7 +361,13 @@ void Alcoholic::dispatchMessage(MPI_Status * status, int * msg) {
 				MPI_Send(&this->clk, 1, MPI_INT, status->MPI_SOURCE, ACCEPT, MPI_COMM_WORLD);
 			}
 		break;
-
+		case END_OF_PROCESSING: {
+			int tmpMsg;
+			MPI_Recv(&tmpMsg, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status);
+			--this->notReadyToExit;
+			this->updateClock(tmpMsg);
+		}
+		break;
 		default: {
 			MPI_Recv(&tmpMsg, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, status);
 			this->updateClock(tmpMsg);		
@@ -385,11 +424,18 @@ void Alcoholic::performAction() {
 					MPI_Send(&this->clk, 1, MPI_INT, waitingForAccept.top(), ACCEPT, MPI_COMM_WORLD);
 					waitingForAccept.pop();
 				}
-				this->myState = WAITING_FOR_PAIR;
+				this->myState = (this->cycles++ < Utils::settings.iterations) ? WAITING_FOR_PAIR : ALCOHOLIC_FINISHING;
 				this->cycles++;
 			}
 			this->remainRestTime -= SLEEP_TIME;
 		break;	
+		}
+		case ALCOHOLIC_FINISHING: {
+			this->myState = ALCOHOLIC_FINISH; 
+			for (int i = 0; i < this->size; ++i) {
+				if (i != this->rank) MPI_Send(&this->clk, 1, MPI_INT, i, END_OF_PROCESSING, MPI_COMM_WORLD);
+			}
+		break;
 		}
 	}
 }
