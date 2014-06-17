@@ -7,7 +7,8 @@
 
 class Process {
 protected:
-	int rank, size, clk, workerCount, notReadyToExit;
+	int rank, size, clk, workerCount;
+	int workersNotReadyToExit, alcoholicsNotReadyToExit;
 	int partnerRank, myState;
 	int msg;
 	std::stack<int> waitingForAccept;
